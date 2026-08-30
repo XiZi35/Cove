@@ -137,11 +137,13 @@ export default function PayPage() {
       setStatus("请在钱包中确认授权 USDC...");
 
       // 3. approve
-      const approveHash = await walletClient.writeContract({
+           const approveHash = await (walletClient as any).writeContract({
         address: USDC_ADDRESS,
         abi: USDC_ABI,
         functionName: "approve",
         args: [PAYMENT_CONTRACT_ADDRESS, amountInUnits],
+        chain: ARC_TESTNET,
+        account,
       });
 
       setStatus("等待授权确认...");
@@ -152,11 +154,13 @@ export default function PayPage() {
       // 4. 调用 pay
       // 注意：合约要求订单先被 createOrder。为了演示能跑通，
       // 如果 pay 失败，我们会提示需要先由商户创建链上订单。
-      const payHash = await walletClient.writeContract({
+            const payHash = await (walletClient as any).writeContract({
         address: PAYMENT_CONTRACT_ADDRESS,
         abi: PAYMENT_ABI,
         functionName: "pay",
         args: [orderIdBytes32],
+        chain: ARC_TESTNET,
+        account,
       });
 
       setStatus("等待支付确认...");

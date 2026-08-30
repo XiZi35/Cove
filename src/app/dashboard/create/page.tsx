@@ -101,11 +101,13 @@ export default function CreatePaymentPage() {
 
       setStatus("请在钱包中确认创建订单...");
 
-      const hash = await walletClient.writeContract({
+            const hash = await (walletClient as any).writeContract({
         address: PAYMENT_CONTRACT_ADDRESS,
         abi: PAYMENT_ABI,
         functionName: "createOrder",
         args: [orderIdBytes32, amountInUnits, description],
+        chain: ARC_TESTNET,
+        account,
       });
 
       setStatus("等待交易确认...");
