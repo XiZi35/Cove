@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Link2, Copy, Check, Loader2, AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  Link2,
+  Copy,
+  Check,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   createWalletClient,
@@ -12,10 +19,7 @@ import {
   keccak256,
   toBytes,
 } from "viem";
-import {
-  PAYMENT_CONTRACT_ADDRESS,
-  PAYMENT_ABI,
-} from "@/lib/contract";
+import { PAYMENT_CONTRACT_ADDRESS, PAYMENT_ABI } from "@/lib/contract";
 import { ARC_TESTNET } from "@/lib/arc";
 
 declare global {
@@ -36,6 +40,13 @@ export default function CreatePaymentPage() {
   const [paymentLink, setPaymentLink] = useState("");
   const [txHash, setTxHash] = useState("");
 
+  useEffect(() => {
+    const email = localStorage.getItem("arcpay_user_email");
+    if (!email) {
+      window.location.href = "/login";
+    }
+  }, []);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !description) return;
@@ -49,7 +60,6 @@ export default function CreatePaymentPage() {
     setStatus("正在连接钱包...");
 
     try {
-      // 切换到 Arc Testnet
       try {
         await window.ethereum.request({
           method: "wallet_switchEthereumChain",
@@ -94,14 +104,13 @@ export default function CreatePaymentPage() {
         transport: http("https://rpc.testnet.arc.io"),
       });
 
-      // 生成 orderId
       const id = `order_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const orderIdBytes32 = keccak256(toBytes(id));
-      const amountInUnits = parseUnits(amount, 6); // USDC 6 decimals
+      const amountInUnits = parseUnits(amount, 6);
 
       setStatus("请在钱包中确认创建订单...");
 
-            const hash = await (walletClient as any).writeContract({
+      const hash = await (walletClient as any).writeContract({
         address: PAYMENT_CONTRACT_ADDRESS,
         abi: PAYMENT_ABI,
         functionName: "createOrder",
@@ -112,18 +121,15 @@ export default function CreatePaymentPage() {
 
       setStatus("等待交易确认...");
       await publicClient.waitForTransactionReceipt({ hash });
-
       setTxHash(hash);
 
-      const link = `${window.location.origin}/pay/${id}`;
-
-      // 本地也存一份，方便支付页读取
-            let merchantAddress = "";
+      let merchantAddress = "";
       try {
         const w = localStorage.getItem("arcpay_wallet");
         if (w) merchantAddress = JSON.parse(w).address || "";
       } catch {}
 
+      const link = `${window.location.origin}/pay/${id}`;
       const orderData = {
         id,
         amount,
@@ -134,6 +140,19 @@ export default function CreatePaymentPage() {
         orderIdBytes32,
         merchantAddress,
       };
+      localStorage.setItem(`arcpay_order_${id}`, JSON.stringify(orderData));
+
+      setPaymentLink(link);
+      setCreated(true);
+      setStatus("");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.shortMessage || err?.message || "创建订单失败");
+      setStatus("");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(paymentLink);
