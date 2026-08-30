@@ -118,6 +118,12 @@ export default function CreatePaymentPage() {
       const link = `${window.location.origin}/pay/${id}`;
 
       // 本地也存一份，方便支付页读取
+            let merchantAddress = "";
+      try {
+        const w = localStorage.getItem("arcpay_wallet");
+        if (w) merchantAddress = JSON.parse(w).address || "";
+      } catch {}
+
       const orderData = {
         id,
         amount,
@@ -126,20 +132,8 @@ export default function CreatePaymentPage() {
         paid: false,
         txHash: hash,
         orderIdBytes32,
+        merchantAddress,
       };
-      localStorage.setItem(`arcpay_order_${id}`, JSON.stringify(orderData));
-
-      setPaymentLink(link);
-      setCreated(true);
-      setStatus("");
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.shortMessage || err?.message || "创建订单失败");
-      setStatus("");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(paymentLink);

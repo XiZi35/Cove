@@ -15,7 +15,6 @@ import {
   custom,
   http,
   parseUnits,
-  encodeFunctionData,
   keccak256,
   toBytes,
 } from "viem";
@@ -33,6 +32,8 @@ declare global {
   }
 }
 
+type PayMode = "contract" | "direct";
+
 export default function PayPage() {
   const params = useParams();
   const orderIdParam = params.id as string;
@@ -41,12 +42,14 @@ export default function PayPage() {
     amount: string;
     description: string;
     paid: boolean;
+    merchantAddress?: string;
   } | null>(null);
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [txHash, setTxHash] = useState("");
+  const [mode, setMode] = useState<PayMode>("direct");
 
   useEffect(() => {
     if (!orderIdParam) return;
@@ -57,6 +60,7 @@ export default function PayPage() {
         amount: data.amount,
         description: data.description,
         paid: data.paid || false,
+        merchantAddress: data.merchantAddress,
       });
       if (data.paid) setPaid(true);
     } else {
@@ -67,6 +71,36 @@ export default function PayPage() {
       });
     }
   }, [orderIdParam]);
+
+  const ensureArcNetwork = async () => {
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x4CEF52" }],
+      });
+    } catch (switchError: any) {
+      if (switchError.code === 4902) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: "0x4CEF52",
+              chainName: "Arc Testnet",
+              nativeCurrency: {
+                name: "USDC",
+                symbol: "USDC",
+                decimals: 18,
+              },
+              rpcUrls: ["https://rpc.testnet.arc.io"],
+              blockExplorerUrls: ["https://testnet.arcscan.app"],
+            },
+          ],
+        });
+      } else {
+        throw switchError;
+      }
+    }
+  };
 
   const handlePay = async () => {
     if (!order || !window.ethereum) {
@@ -79,34 +113,7 @@ export default function PayPage() {
     setStatus("正在连接钱包...");
 
     try {
-      // 1. 切换到 Arc Testnet
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x4CEF52" }],
-        });
-      } catch (switchError: any) {
-        if (switchError.code === 4902) {
-          await window.ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [
-              {
-                chainId: "0x4CEF52",
-                chainName: "Arc Testnet",
-                nativeCurrency: {
-                  name: "USDC",
-                  symbol: "USDC",
-                  decimals: 18,
-                },
-                rpcUrls: ["https://rpc.testnet.arc.io"],
-                blockExplorerUrls: ["https://testnet.arcscan.app"],
-              },
-            ],
-          });
-        } else {
-          throw switchError;
-        }
-      }
+      await ensureArcNetwork();
 
       const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
@@ -124,56 +131,74 @@ export default function PayPage() {
         transport: http("https://rpc.testnet.arc.io"),
       });
 
-      // USDC 在 Arc 上 ERC-20 接口是 6 位小数
       const amountInUnits = parseUnits(order.amount, 6);
 
-      // 把字符串 orderId 转成 bytes32
-      const orderIdBytes32 = keccak256(toBytes(orderIdParam));
+      // —— 模式 1：直接转账到商户钱包 ——
+      if (mode === "direct") {
+        const to = order.merchantAddress as `0x${string}` | undefined;
+        if (!to) {
+          throw new Error("订单缺少商户地址，请使用合约支付或重新创建订单");
+        }
 
-      // 2. 先调用 createOrder（如果订单还不存在）
-      // 为简化演示，这里由付款人直接 pay。正式产品应由商户先 createOrder。
-      // 我们先尝试直接 pay，如果订单不存在会失败，所以这里先做 approve + 提示。
+        setStatus("请在钱包中确认转账...");
 
-      setStatus("请在钱包中确认授权 USDC...");
+        const hash = await (walletClient as any).writeContract({
+          address: USDC_ADDRESS,
+          abi: [
+            ...USDC_ABI,
+            {
+              inputs: [
+                { name: "to", type: "address" },
+                { name: "amount", type: "uint256" },
+              ],
+              name: "transfer",
+              outputs: [{ name: "", type: "bool" }],
+              stateMutability: "nonpayable",
+              type: "function",
+            },
+          ],
+          functionName: "transfer",
+          args: [to, amountInUnits],
+          chain: ARC_TESTNET,
+          account,
+        });
 
-      // 3. approve
-           const approveHash = await (walletClient as any).writeContract({
-        address: USDC_ADDRESS,
-        abi: USDC_ABI,
-        functionName: "approve",
-        args: [PAYMENT_CONTRACT_ADDRESS, amountInUnits],
-        chain: ARC_TESTNET,
-        account,
-      });
+        setStatus("等待确认...");
+        await publicClient.waitForTransactionReceipt({ hash });
+        setTxHash(hash);
+      } else {
+        // —— 模式 2：合约支付（approve + pay） ——
+        const orderIdBytes32 = keccak256(toBytes(orderIdParam));
 
-      setStatus("等待授权确认...");
-      await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        setStatus("请确认授权 USDC...");
+        const approveHash = await (walletClient as any).writeContract({
+          address: USDC_ADDRESS,
+          abi: USDC_ABI,
+          functionName: "approve",
+          args: [PAYMENT_CONTRACT_ADDRESS, amountInUnits],
+          chain: ARC_TESTNET,
+          account,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-      setStatus("请在钱包中确认支付...");
+        setStatus("请确认支付...");
+        const payHash = await (walletClient as any).writeContract({
+          address: PAYMENT_CONTRACT_ADDRESS,
+          abi: PAYMENT_ABI,
+          functionName: "pay",
+          args: [orderIdBytes32],
+          chain: ARC_TESTNET,
+          account,
+        });
+        await publicClient.waitForTransactionReceipt({ hash: payHash });
+        setTxHash(payHash);
+      }
 
-      // 4. 调用 pay
-      // 注意：合约要求订单先被 createOrder。为了演示能跑通，
-      // 如果 pay 失败，我们会提示需要先由商户创建链上订单。
-            const payHash = await (walletClient as any).writeContract({
-        address: PAYMENT_CONTRACT_ADDRESS,
-        abi: PAYMENT_ABI,
-        functionName: "pay",
-        args: [orderIdBytes32],
-        chain: ARC_TESTNET,
-        account,
-      });
-
-      setStatus("等待支付确认...");
-      await publicClient.waitForTransactionReceipt({ hash: payHash });
-
-      setTxHash(payHash);
-
-      // 更新本地状态
       const raw = localStorage.getItem(`arcpay_order_${orderIdParam}`);
       if (raw) {
         const data = JSON.parse(raw);
         data.paid = true;
-        data.txHash = payHash;
+        data.txHash = txHash;
         localStorage.setItem(
           `arcpay_order_${orderIdParam}`,
           JSON.stringify(data)
@@ -184,8 +209,7 @@ export default function PayPage() {
       setStatus("");
     } catch (err: any) {
       console.error(err);
-      const msg = err?.shortMessage || err?.message || "支付失败";
-      setError(msg);
+      setError(err?.shortMessage || err?.message || "支付失败");
       setStatus("");
     } finally {
       setPaying(false);
@@ -217,7 +241,6 @@ export default function PayPage() {
             </span>
           </p>
           <p className="text-sm text-slate-400 mb-6">{order.description}</p>
-
           {txHash && (
             <a
               href={`https://testnet.arcscan.app/tx/${txHash}`}
@@ -228,13 +251,6 @@ export default function PayPage() {
               在浏览器查看交易 →
             </a>
           )}
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 text-left shadow-sm">
-            <p className="text-xs text-slate-400 mb-1">收款合约</p>
-            <p className="text-sm font-mono text-slate-700 break-all">
-              {PAYMENT_CONTRACT_ADDRESS}
-            </p>
-          </div>
         </div>
       </div>
     );
@@ -254,7 +270,7 @@ export default function PayPage() {
           <div className="p-6 border-b border-slate-100">
             <p className="text-sm text-slate-500 mb-1">支付金额</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-semibold text-slate-900 tracking-tight">
+              <span className="text-3xl font-semibold text-slate-900">
                 {order.amount}
               </span>
               <span className="text-base text-slate-500 font-medium">USDC</span>
@@ -263,6 +279,38 @@ export default function PayPage() {
           </div>
 
           <div className="p-6 space-y-4">
+            {/* 支付方式 */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setMode("direct")}
+                className={`py-2 text-sm rounded-lg font-medium transition-all ${
+                  mode === "direct"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                直接转账
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("contract")}
+                className={`py-2 text-sm rounded-lg font-medium transition-all ${
+                  mode === "contract"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                合约支付
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 text-center">
+              {mode === "direct"
+                ? "USDC 将直接转入商户钱包地址"
+                : "通过 PaymentReceiver 合约完成支付"}
+            </p>
+
             {error && (
               <div className="flex items-start gap-2 text-sm text-red-500 bg-red-50 p-3 rounded-xl">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -293,7 +341,7 @@ export default function PayPage() {
 
             <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>支付将在 Arc 测试网完成 · 秒级确认</span>
+              <span>Arc Testnet · USDC</span>
             </div>
           </div>
         </div>
