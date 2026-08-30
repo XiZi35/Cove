@@ -12,6 +12,7 @@ import {
   Loader2,
   RefreshCw,
   ArrowDownToLine,
+  Link2,
 } from "lucide-react";
 
 type Order = {
@@ -26,6 +27,7 @@ type Order = {
 export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [copied, setCopied] = useState(false);
+  const [copiedOrderId, setCopiedOrderId] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [walletAddress, setWalletAddress] = useState("加载中...");
@@ -44,16 +46,11 @@ export default function DashboardPage() {
         body: JSON.stringify({ action: "getBalance", walletId: id }),
       });
       const data = await res.json();
-      // Circle 返回 tokenBalances 数组
       const tokens = data?.tokenBalances || data?.data?.tokenBalances || [];
       const usdc = tokens.find((t: any) =>
         (t.token?.symbol || t.symbol || "").toUpperCase().includes("USDC")
       );
-      if (usdc) {
-        setUsdcBalance(usdc.amount || usdc.balance || "0");
-      } else {
-        setUsdcBalance("0");
-      }
+      setUsdcBalance(usdc ? usdc.amount || usdc.balance || "0" : "0");
     } catch {
       setUsdcBalance(null);
     } finally {
@@ -63,7 +60,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const savedEmail = localStorage.getItem("arcpay_user_email");
-    if (savedEmail) setEmail(savedEmail);
+    if (!savedEmail) {
+      window.location.href = "/login";
+      return;
+    }
+    setEmail(savedEmail);
 
     try {
       const walletRaw = localStorage.getItem("arcpay_wallet");
@@ -101,7 +102,6 @@ export default function DashboardPage() {
         } catch {}
       }
     }
-
     allOrders.sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -120,6 +120,13 @@ export default function DashboardPage() {
     navigator.clipboard.writeText(fullWalletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyLink = (orderId: string) => {
+    const link = `${window.location.origin}/pay/${orderId}`;
+    navigator.clipboard.writeText(link);
+    setCopiedOrderId(orderId);
+    setTimeout(() => setCopiedOrderId(""), 2000);
   };
 
   const formatTime = (iso: string) => {
@@ -157,7 +164,7 @@ export default function DashboardPage() {
                 localStorage.removeItem("arcpay_user_email");
                 window.location.href = "/login";
               }}
-              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
             >
               <LogOut className="w-4 h-4" />
               退出
@@ -176,20 +183,19 @@ export default function DashboardPage() {
           </div>
           <button
             onClick={() => (window.location.href = "/dashboard/create")}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium transition-all shadow-sm shadow-teal-700/20"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium shadow-sm shadow-teal-700/20"
           >
             <Plus className="w-4 h-4" />
             创建支付链接
           </button>
         </div>
 
-        {/* 余额卡片 */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-slate-500 mb-1">钱包 USDC 余额</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-semibold text-slate-900 tracking-tight">
+                <span className="text-3xl font-semibold text-slate-900">
                   {balanceLoading
                     ? "..."
                     : usdcBalance !== null
@@ -207,8 +213,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => walletId && loadBalance(walletId)}
-                className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
-                title="刷新余额"
+                className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100"
               >
                 <RefreshCw
                   className={`w-4 h-4 text-slate-600 ${
@@ -232,7 +237,7 @@ export default function DashboardPage() {
             <button
               onClick={handleCopy}
               disabled={!fullWalletAddress}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               <Copy className="w-3.5 h-3.5" />
               {copied ? "已复制" : "复制"}
@@ -242,7 +247,7 @@ export default function DashboardPage() {
                 href={`https://testnet.arcscan.app/address/${fullWalletAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 浏览器
@@ -250,7 +255,7 @@ export default function DashboardPage() {
             )}
             <a
               href="/dashboard/withdraw"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm hover:bg-teal-800 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm hover:bg-teal-800"
             >
               <ArrowDownToLine className="w-3.5 h-3.5" />
               提现
@@ -258,7 +263,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 订单列表 */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-medium text-slate-900">订单列表</h2>
@@ -278,7 +282,7 @@ export default function DashboardPage() {
               {orders.map((order) => (
                 <div
                   key={order.id}
-                  className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
+                  className="px-6 py-4 flex items-center justify-between gap-3 hover:bg-slate-50/50"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
@@ -303,18 +307,30 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0 ml-4">
-                    <p className="text-sm font-medium text-slate-900">
-                      {order.paid ? "+" : ""}
-                      {order.amount} USDC
-                    </p>
-                    <p
-                      className={`text-xs mt-0.5 ${
-                        order.paid ? "text-emerald-600" : "text-amber-600"
-                      }`}
-                    >
-                      {order.paid ? "已支付" : "待支付"}
-                    </p>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {!order.paid && (
+                      <button
+                        onClick={() => handleCopyLink(order.id)}
+                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-teal-700"
+                        title="复制支付链接"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        {copiedOrderId === order.id ? "已复制" : "链接"}
+                      </button>
+                    )}
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-slate-900">
+                        {order.paid ? "+" : ""}
+                        {order.amount} USDC
+                      </p>
+                      <p
+                        className={`text-xs mt-0.5 ${
+                          order.paid ? "text-emerald-600" : "text-amber-600"
+                        }`}
+                      >
+                        {order.paid ? "已支付" : "待支付"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))}
