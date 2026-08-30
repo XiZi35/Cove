@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   LogOut,
   Loader2,
+  RefreshCw,
+  ArrowDownToLine,
 } from "lucide-react";
 
 type Order = {
@@ -28,13 +30,41 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [walletAddress, setWalletAddress] = useState("加载中...");
   const [fullWalletAddress, setFullWalletAddress] = useState("");
+  const [walletId, setWalletId] = useState("");
+  const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+
+  const loadBalance = async (id: string) => {
+    if (!id) return;
+    setBalanceLoading(true);
+    try {
+      const res = await fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getBalance", walletId: id }),
+      });
+      const data = await res.json();
+      // Circle 返回 tokenBalances 数组
+      const tokens = data?.tokenBalances || data?.data?.tokenBalances || [];
+      const usdc = tokens.find((t: any) =>
+        (t.token?.symbol || t.symbol || "").toUpperCase().includes("USDC")
+      );
+      if (usdc) {
+        setUsdcBalance(usdc.amount || usdc.balance || "0");
+      } else {
+        setUsdcBalance("0");
+      }
+    } catch {
+      setUsdcBalance(null);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // 读取登录邮箱
     const savedEmail = localStorage.getItem("arcpay_user_email");
     if (savedEmail) setEmail(savedEmail);
 
-    // 读取 Circle 钱包
     try {
       const walletRaw = localStorage.getItem("arcpay_wallet");
       if (walletRaw) {
@@ -45,10 +75,13 @@ export default function DashboardPage() {
             wallet.address.slice(0, 6) + "..." + wallet.address.slice(-4)
           );
         }
+        if (wallet.walletId) {
+          setWalletId(wallet.walletId);
+          loadBalance(wallet.walletId);
+        }
       }
     } catch {}
 
-    // 读取所有本地订单
     const allOrders: Order[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -69,7 +102,6 @@ export default function DashboardPage() {
       }
     }
 
-    // 按创建时间倒序
     allOrders.sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -106,7 +138,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 顶部导航 */}
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -136,7 +167,6 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* 欢迎语 + 创建按钮 */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">商户后台</h1>
@@ -157,22 +187,42 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-slate-500 mb-1">已收款总额</p>
+              <p className="text-sm text-slate-500 mb-1">钱包 USDC 余额</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-semibold text-slate-900 tracking-tight">
-                  {totalPaid}
+                  {balanceLoading
+                    ? "..."
+                    : usdcBalance !== null
+                    ? usdcBalance
+                    : totalPaid}
                 </span>
                 <span className="text-base text-slate-500 font-medium">
                   USDC
                 </span>
               </div>
+              <p className="text-xs text-slate-400 mt-1">
+                本地已确认收款：{totalPaid} USDC
+              </p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-teal-700" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => walletId && loadBalance(walletId)}
+                className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-colors"
+                title="刷新余额"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 text-slate-600 ${
+                    balanceLoading ? "animate-spin" : ""
+                  }`}
+                />
+              </button>
+              <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-teal-700" />
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 pt-5 border-t border-slate-100 flex items-center gap-3">
+          <div className="mt-5 pt-5 border-t border-slate-100 flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-xs text-slate-400 mb-1">收款钱包地址</p>
               <p className="text-sm font-mono text-slate-700 truncate">
@@ -198,6 +248,13 @@ export default function DashboardPage() {
                 浏览器
               </a>
             )}
+            <a
+              href="/dashboard/withdraw"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm hover:bg-teal-800 transition-colors"
+            >
+              <ArrowDownToLine className="w-3.5 h-3.5" />
+              提现
+            </a>
           </div>
         </div>
 
@@ -205,9 +262,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-medium text-slate-900">订单列表</h2>
-            <span className="text-xs text-slate-400">
-              共 {orders.length} 笔
-            </span>
+            <span className="text-xs text-slate-400">共 {orders.length} 笔</span>
           </div>
 
           {loading ? (
@@ -244,12 +299,10 @@ export default function DashboardPage() {
                         {order.description}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {order.id.slice(0, 18)}... ·{" "}
-                        {formatTime(order.createdAt)}
+                        {order.id.slice(0, 18)}... · {formatTime(order.createdAt)}
                       </p>
                     </div>
                   </div>
-
                   <div className="text-right shrink-0 ml-4">
                     <p className="text-sm font-medium text-slate-900">
                       {order.paid ? "+" : ""}

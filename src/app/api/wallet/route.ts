@@ -16,7 +16,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Missing email" }, { status: 400 });
       }
 
-      // 创建 Wallet Set
       const walletSetRes = await client.createWalletSet({
         name: `ArcPay-${email}`,
       });
@@ -29,7 +28,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // 在 Arc Testnet 创建钱包
       const walletRes = await client.createWallets({
         accountType: "EOA",
         blockchains: ["ARC-TESTNET"],
