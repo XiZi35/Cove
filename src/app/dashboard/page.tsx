@@ -14,6 +14,14 @@ import {
   ArrowDownToLine,
   Link2,
 } from "lucide-react";
+import { ArcPayLogo } from "@/components/Logo";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
+import {
+  type Locale,
+  t,
+  getStoredLocale,
+  setStoredLocale,
+} from "@/lib/i18n";
 
 type Order = {
   id: string;
@@ -31,11 +39,12 @@ export default function DashboardPage() {
   const [copiedOrderId, setCopiedOrderId] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
-  const [walletAddress, setWalletAddress] = useState("加载中...");
+  const [walletAddress, setWalletAddress] = useState("...");
   const [fullWalletAddress, setFullWalletAddress] = useState("");
   const [walletId, setWalletId] = useState("");
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [locale, setLocale] = useState<Locale>("zh");
 
   const loadBalance = async (id: string) => {
     if (!id) return;
@@ -48,8 +57,8 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       const tokens = data?.tokenBalances || data?.data?.tokenBalances || [];
-      const usdc = tokens.find((t: any) =>
-        (t.token?.symbol || t.symbol || "").toUpperCase().includes("USDC")
+      const usdc = tokens.find((tok: any) =>
+        (tok.token?.symbol || tok.symbol || "").toUpperCase().includes("USDC")
       );
       setUsdcBalance(usdc ? usdc.amount || usdc.balance || "0" : "0");
     } catch {
@@ -60,6 +69,8 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    setLocale(getStoredLocale());
+
     const savedEmail = localStorage.getItem("arcpay_user_email");
     if (!savedEmail) {
       window.location.href = "/login";
@@ -112,6 +123,11 @@ export default function DashboardPage() {
     setLoading(false);
   }, []);
 
+  const switchLocale = (l: Locale) => {
+    setLocale(l);
+    setStoredLocale(l);
+  };
+
   const totalPaid = orders
     .filter((o) => o.paid)
     .reduce((sum, o) => sum + parseFloat(o.amount || "0"), 0)
@@ -147,6 +163,12 @@ export default function DashboardPage() {
       const date = new Date(iso);
       const now = new Date();
       const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+      if (locale === "en") {
+        if (diff < 60) return "just now";
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return date.toLocaleDateString("en-US");
+      }
       if (diff < 60) return "刚刚";
       if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
       if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
@@ -160,13 +182,9 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-teal-700 text-white flex items-center justify-center text-sm font-bold">
-              A
-            </div>
-            <span className="font-semibold text-slate-900">ArcPay</span>
-          </div>
-          <div className="flex items-center gap-4">
+          <ArcPayLogo size={28} withWordmark />
+          <div className="flex items-center gap-3">
+            <LanguageSwitch locale={locale} onChange={switchLocale} />
             {email && (
               <span className="text-sm text-slate-500 hidden sm:block">
                 {email}
@@ -180,18 +198,20 @@ export default function DashboardPage() {
               className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
             >
               <LogOut className="w-4 h-4" />
-              退出
+              {t(locale, "logout")}
             </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">收款工作台</h1>
+            <h1 className="text-xl font-semibold text-slate-900">
+              {t(locale, "dashTitle")}
+            </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              管理支付链接与到账记录 · Arc Testnet
+              {t(locale, "dashSub")}
             </p>
           </div>
           <button
@@ -199,14 +219,15 @@ export default function DashboardPage() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-medium shadow-sm shadow-teal-700/20"
           >
             <Plus className="w-4 h-4" />
-            创建支付链接
+            {t(locale, "createLink")}
           </button>
         </div>
 
-        {/* 概览 */}
         <div className="grid sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <p className="text-xs text-slate-400 mb-1">钱包余额</p>
+            <p className="text-xs text-slate-400 mb-1">
+              {t(locale, "balWallet")}
+            </p>
             <p className="text-2xl font-semibold text-slate-900">
               {balanceLoading
                 ? "..."
@@ -217,22 +238,27 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <p className="text-xs text-slate-400 mb-1">已确认收款</p>
+            <p className="text-xs text-slate-400 mb-1">
+              {t(locale, "balConfirmed")}
+            </p>
             <p className="text-2xl font-semibold text-slate-900">
               {totalPaid}{" "}
               <span className="text-sm font-medium text-slate-500">USDC</span>
             </p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <p className="text-xs text-slate-400 mb-1">待支付订单</p>
+            <p className="text-xs text-slate-400 mb-1">
+              {t(locale, "balPending")}
+            </p>
             <p className="text-2xl font-semibold text-slate-900">
               {pendingCount}{" "}
-              <span className="text-sm font-medium text-slate-500">笔</span>
+              <span className="text-sm font-medium text-slate-500">
+                {t(locale, "pendingUnit")}
+              </span>
             </p>
           </div>
         </div>
 
-        {/* 钱包卡片 */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -240,8 +266,12 @@ export default function DashboardPage() {
                 <Wallet className="w-5 h-5 text-teal-700" />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-900">收款钱包</p>
-                <p className="text-xs text-slate-400">Circle · Arc Testnet</p>
+                <p className="text-sm font-medium text-slate-900">
+                  {t(locale, "walletCard")}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {t(locale, "walletMeta")}
+                </p>
               </div>
             </div>
             <button
@@ -265,7 +295,7 @@ export default function DashboardPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               <Copy className="w-3.5 h-3.5" />
-              {copied ? "已复制" : "复制地址"}
+              {copied ? t(locale, "copied") : t(locale, "copyAddress")}
             </button>
             {fullWalletAddress && (
               <a
@@ -275,7 +305,7 @@ export default function DashboardPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                浏览器
+                {t(locale, "explorer")}
               </a>
             )}
             <a
@@ -283,16 +313,21 @@ export default function DashboardPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-700 text-white text-sm hover:bg-teal-800"
             >
               <ArrowDownToLine className="w-3.5 h-3.5" />
-              提现
+              {t(locale, "withdraw")}
             </a>
           </div>
         </div>
 
-        {/* 订单 */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-medium text-slate-900">订单与交易</h2>
-            <span className="text-xs text-slate-400">共 {orders.length} 笔</span>
+            <h2 className="font-medium text-slate-900">
+              {t(locale, "ordersTitle")}
+            </h2>
+            <span className="text-xs text-slate-400">
+              {locale === "zh"
+                ? `${t(locale, "ordersTotal")} ${orders.length} ${t(locale, "ordersUnit")}`
+                : `${orders.length} ${t(locale, "ordersUnit")}`}
+            </span>
           </div>
 
           {loading ? (
@@ -302,13 +337,13 @@ export default function DashboardPage() {
           ) : orders.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="text-sm text-slate-500 mb-3">
-                还没有收款订单。创建第一笔支付链接，开始接收 USDC。
+                {t(locale, "emptyOrders")}
               </p>
               <button
                 onClick={() => (window.location.href = "/dashboard/create")}
                 className="text-sm text-teal-700 font-medium hover:underline"
               >
-                去创建 →
+                {t(locale, "emptyCta")}
               </button>
             </div>
           ) : (
@@ -347,7 +382,7 @@ export default function DashboardPage() {
                               rel="noopener noreferrer"
                               className="text-teal-700 hover:underline"
                             >
-                              查看交易
+                              {t(locale, "viewTx")}
                             </a>
                           </>
                         )}
@@ -361,7 +396,9 @@ export default function DashboardPage() {
                         className="flex items-center gap-1 text-xs text-slate-500 hover:text-teal-700"
                       >
                         <Link2 className="w-3.5 h-3.5" />
-                        {copiedOrderId === order.id ? "已复制" : "复制链接"}
+                        {copiedOrderId === order.id
+                          ? t(locale, "copied")
+                          : t(locale, "copyLink")}
                       </button>
                     )}
                     <div className="text-right">
@@ -374,7 +411,9 @@ export default function DashboardPage() {
                           order.paid ? "text-emerald-600" : "text-amber-600"
                         }`}
                       >
-                        {order.paid ? "已支付" : "待支付"}
+                        {order.paid
+                          ? t(locale, "statusPaid")
+                          : t(locale, "statusPending")}
                       </p>
                     </div>
                   </div>
