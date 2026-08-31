@@ -22,6 +22,7 @@ type Order = {
   createdAt: string;
   paid: boolean;
   txHash?: string;
+  merchantAddress?: string;
 };
 
 export default function DashboardPage() {
@@ -97,6 +98,7 @@ export default function DashboardPage() {
               createdAt: data.createdAt,
               paid: data.paid || false,
               txHash: data.txHash,
+              merchantAddress: data.merchantAddress,
             });
           }
         } catch {}
@@ -115,6 +117,8 @@ export default function DashboardPage() {
     .reduce((sum, o) => sum + parseFloat(o.amount || "0"), 0)
     .toFixed(2);
 
+  const pendingCount = orders.filter((o) => !o.paid).length;
+
   const handleCopy = () => {
     if (!fullWalletAddress) return;
     navigator.clipboard.writeText(fullWalletAddress);
@@ -122,10 +126,19 @@ export default function DashboardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleCopyLink = (orderId: string) => {
-    const link = `${window.location.origin}/pay/${orderId}`;
+  const handleCopyLink = (order: Order) => {
+    const payload = {
+      id: order.id,
+      amount: order.amount,
+      description: order.description,
+      merchantAddress: order.merchantAddress || fullWalletAddress,
+    };
+    const encoded = btoa(
+      unescape(encodeURIComponent(JSON.stringify(payload)))
+    );
+    const link = `${window.location.origin}/pay/${order.id}?d=${encoded}`;
     navigator.clipboard.writeText(link);
-    setCopiedOrderId(orderId);
+    setCopiedOrderId(order.id);
     setTimeout(() => setCopiedOrderId(""), 2000);
   };
 
@@ -176,9 +189,9 @@ export default function DashboardPage() {
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">商户后台</h1>
+            <h1 className="text-xl font-semibold text-slate-900">收款工作台</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              管理你的收款与支付链接
+              管理支付链接与到账记录 · Arc Testnet
             </p>
           </div>
           <button
@@ -190,57 +203,69 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {/* 概览 */}
+        <div className="grid sm:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <p className="text-xs text-slate-400 mb-1">钱包余额</p>
+            <p className="text-2xl font-semibold text-slate-900">
+              {balanceLoading
+                ? "..."
+                : usdcBalance !== null
+                ? usdcBalance
+                : "—"}{" "}
+              <span className="text-sm font-medium text-slate-500">USDC</span>
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <p className="text-xs text-slate-400 mb-1">已确认收款</p>
+            <p className="text-2xl font-semibold text-slate-900">
+              {totalPaid}{" "}
+              <span className="text-sm font-medium text-slate-500">USDC</span>
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <p className="text-xs text-slate-400 mb-1">待支付订单</p>
+            <p className="text-2xl font-semibold text-slate-900">
+              {pendingCount}{" "}
+              <span className="text-sm font-medium text-slate-500">笔</span>
+            </p>
+          </div>
+        </div>
+
+        {/* 钱包卡片 */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-slate-500 mb-1">钱包 USDC 余额</p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-semibold text-slate-900">
-                  {balanceLoading
-                    ? "..."
-                    : usdcBalance !== null
-                    ? usdcBalance
-                    : totalPaid}
-                </span>
-                <span className="text-base text-slate-500 font-medium">
-                  USDC
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                本地已确认收款：{totalPaid} USDC
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => walletId && loadBalance(walletId)}
-                className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 text-slate-600 ${
-                    balanceLoading ? "animate-spin" : ""
-                  }`}
-                />
-              </button>
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center">
                 <Wallet className="w-5 h-5 text-teal-700" />
               </div>
+              <div>
+                <p className="text-sm font-medium text-slate-900">收款钱包</p>
+                <p className="text-xs text-slate-400">Circle · Arc Testnet</p>
+              </div>
             </div>
+            <button
+              onClick={() => walletId && loadBalance(walletId)}
+              className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center hover:bg-slate-100"
+            >
+              <RefreshCw
+                className={`w-4 h-4 text-slate-600 ${
+                  balanceLoading ? "animate-spin" : ""
+                }`}
+              />
+            </button>
           </div>
-
-          <div className="mt-5 pt-5 border-t border-slate-100 flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-slate-400 mb-1">收款钱包地址</p>
-              <p className="text-sm font-mono text-slate-700 truncate">
-                {walletAddress}
-              </p>
-            </div>
+          <p className="text-sm font-mono text-slate-700 break-all mb-4">
+            {fullWalletAddress || walletAddress}
+          </p>
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={handleCopy}
               disabled={!fullWalletAddress}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               <Copy className="w-3.5 h-3.5" />
-              {copied ? "已复制" : "复制"}
+              {copied ? "已复制" : "复制地址"}
             </button>
             {fullWalletAddress && (
               <a
@@ -263,9 +288,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* 订单 */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-medium text-slate-900">订单列表</h2>
+            <h2 className="font-medium text-slate-900">订单与交易</h2>
             <span className="text-xs text-slate-400">共 {orders.length} 笔</span>
           </div>
 
@@ -274,15 +300,23 @@ export default function DashboardPage() {
               <Loader2 className="w-5 h-5 animate-spin text-teal-700" />
             </div>
           ) : orders.length === 0 ? (
-            <div className="px-6 py-12 text-center text-sm text-slate-400">
-              暂无订单，点击右上角创建第一笔支付链接
+            <div className="px-6 py-12 text-center">
+              <p className="text-sm text-slate-500 mb-3">
+                还没有收款订单。创建第一笔支付链接，开始接收 USDC。
+              </p>
+              <button
+                onClick={() => (window.location.href = "/dashboard/create")}
+                className="text-sm text-teal-700 font-medium hover:underline"
+              >
+                去创建 →
+              </button>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
               {orders.map((order) => (
                 <div
                   key={order.id}
-                  className="px-6 py-4 flex items-center justify-between gap-3 hover:bg-slate-50/50"
+                  className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
@@ -303,19 +337,31 @@ export default function DashboardPage() {
                         {order.description}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {order.id.slice(0, 18)}... · {formatTime(order.createdAt)}
+                        {formatTime(order.createdAt)}
+                        {order.txHash && (
+                          <>
+                            {" · "}
+                            <a
+                              href={`https://testnet.arcscan.app/tx/${order.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-teal-700 hover:underline"
+                            >
+                              查看交易
+                            </a>
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0 sm:ml-4">
                     {!order.paid && (
                       <button
-                        onClick={() => handleCopyLink(order.id)}
+                        onClick={() => handleCopyLink(order)}
                         className="flex items-center gap-1 text-xs text-slate-500 hover:text-teal-700"
-                        title="复制支付链接"
                       >
                         <Link2 className="w-3.5 h-3.5" />
-                        {copiedOrderId === order.id ? "已复制" : "链接"}
+                        {copiedOrderId === order.id ? "已复制" : "复制链接"}
                       </button>
                     )}
                     <div className="text-right">

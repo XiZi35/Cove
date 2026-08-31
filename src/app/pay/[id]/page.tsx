@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import {
   createWalletClient,
@@ -15,15 +17,8 @@ import {
   custom,
   http,
   parseUnits,
-  keccak256,
-  toBytes,
 } from "viem";
-import {
-  PAYMENT_CONTRACT_ADDRESS,
-  PAYMENT_ABI,
-  USDC_ADDRESS,
-  USDC_ABI,
-} from "@/lib/contract";
+import { USDC_ADDRESS } from "@/lib/contract";
 import { ARC_TESTNET } from "@/lib/arc";
 
 declare global {
@@ -31,8 +26,6 @@ declare global {
     ethereum?: any;
   }
 }
-
-type PayMode = "contract" | "direct";
 
 export default function PayPage() {
   const params = useParams();
@@ -49,12 +42,12 @@ export default function PayPage() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [txHash, setTxHash] = useState("");
-  const [mode, setMode] = useState<PayMode>("direct");
+  const [copied, setCopied] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
     if (!orderIdParam) return;
 
-    // 1. 优先从 URL 参数读（跨设备可用）
     try {
       const sp = new URLSearchParams(window.location.search);
       const d = sp.get("d");
@@ -72,7 +65,6 @@ export default function PayPage() {
       console.warn("parse url payload failed", e);
     }
 
-    // 2. 回退 localStorage（同一浏览器）
     try {
       const raw = localStorage.getItem(`arcpay_order_${orderIdParam}`);
       if (raw) {
@@ -83,17 +75,16 @@ export default function PayPage() {
           paid: data.paid || false,
           merchantAddress: data.merchantAddress,
         });
-        if (data.paid) setPaid(true);
+        if (data.paid) {
+          setPaid(true);
+          if (data.txHash) setTxHash(data.txHash);
+        }
         return;
       }
     } catch {}
 
     setError("订单不存在或链接无效，请让商户重新生成支付链接");
-    setOrder({
-      amount: "0",
-      description: "无效订单",
-      paid: false,
-    });
+    setOrder({ amount: "0", description: "无效订单", paid: false });
   }, [orderIdParam]);
 
   const ensureArcNetwork = async () => {
@@ -126,10 +117,19 @@ export default function PayPage() {
     }
   };
 
+  const handleCopyAddress = () => {
+    if (!order?.merchantAddress) return;
+    navigator.clipboard.writeText(order.merchantAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handlePay = async () => {
     if (!order) return;
     if (!window.ethereum) {
-      setError("请先安装 MetaMask 浏览器扩展");
+      setError(
+        "未检测到钱包。请安装并解锁 MetaMask，网络选择 Arc Testnet 后刷新页面。"
+      );
       return;
     }
 
@@ -156,67 +156,39 @@ export default function PayPage() {
         transport: http("https://rpc.testnet.arc.io"),
       });
 
-      const amountInUnits = parseUnits(order.amount, 6);
-      let hash: `0x${string}`;
-
-      if (mode === "direct") {
-        const to = order.merchantAddress as `0x${string}` | undefined;
-        if (!to || !to.startsWith("0x") || to.length < 42) {
-          throw new Error("商户收款地址无效，请重新生成支付链接");
-        }
-
-        setStatus("请在 MetaMask 中确认转账...");
-
-        hash = await (walletClient as any).writeContract({
-          address: USDC_ADDRESS,
-          abi: [
-            {
-              inputs: [
-                { name: "to", type: "address" },
-                { name: "amount", type: "uint256" },
-              ],
-              name: "transfer",
-              outputs: [{ name: "", type: "bool" }],
-              stateMutability: "nonpayable",
-              type: "function",
-            },
-          ],
-          functionName: "transfer",
-          args: [to, amountInUnits],
-          chain: ARC_TESTNET,
-          account,
-        });
-      } else {
-        // 合约支付（需订单已在链上 createOrder）
-        const orderIdBytes32 = keccak256(toBytes(orderIdParam));
-
-        setStatus("请确认授权 USDC...");
-        const approveHash = await (walletClient as any).writeContract({
-          address: USDC_ADDRESS,
-          abi: USDC_ABI,
-          functionName: "approve",
-          args: [PAYMENT_CONTRACT_ADDRESS, amountInUnits],
-          chain: ARC_TESTNET,
-          account,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
-
-        setStatus("请确认支付...");
-        hash = await (walletClient as any).writeContract({
-          address: PAYMENT_CONTRACT_ADDRESS,
-          abi: PAYMENT_ABI,
-          functionName: "pay",
-          args: [orderIdBytes32],
-          chain: ARC_TESTNET,
-          account,
-        });
+      const to = order.merchantAddress as `0x${string}` | undefined;
+      if (!to || !to.startsWith("0x") || to.length < 42) {
+        throw new Error("商户收款地址无效，请重新生成支付链接");
       }
 
-      setStatus("等待交易确认...");
+      const amountInUnits = parseUnits(order.amount, 6);
+
+      setStatus("请在 MetaMask 中确认转账...");
+
+      const hash = await (walletClient as any).writeContract({
+        address: USDC_ADDRESS,
+        abi: [
+          {
+            inputs: [
+              { name: "to", type: "address" },
+              { name: "amount", type: "uint256" },
+            ],
+            name: "transfer",
+            outputs: [{ name: "", type: "bool" }],
+            stateMutability: "nonpayable",
+            type: "function",
+          },
+        ],
+        functionName: "transfer",
+        args: [to, amountInUnits],
+        chain: ARC_TESTNET,
+        account,
+      });
+
+      setStatus("等待链上确认...");
       await publicClient.waitForTransactionReceipt({ hash });
       setTxHash(hash);
 
-      // 本地标记已支付（仅当前浏览器）
       try {
         const raw = localStorage.getItem(`arcpay_order_${orderIdParam}`);
         if (raw) {
@@ -234,7 +206,7 @@ export default function PayPage() {
       setStatus("");
     } catch (err: any) {
       console.error(err);
-      setError(err?.shortMessage || err?.message || "支付失败");
+      setError(err?.shortMessage || err?.message || "支付失败，请重试");
       setStatus("");
     } finally {
       setPaying(false);
@@ -271,11 +243,13 @@ export default function PayPage() {
               href={`https://testnet.arcscan.app/tx/${txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block text-sm text-teal-700 hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm text-teal-700 hover:underline"
             >
-              在浏览器查看交易 →
+              在 ArcScan 查看交易
+              <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
+          <p className="mt-8 text-xs text-slate-400">Arc Testnet · 测试网络</p>
         </div>
       </div>
     );
@@ -301,45 +275,56 @@ export default function PayPage() {
               <span className="text-base text-slate-500 font-medium">USDC</span>
             </div>
             <p className="mt-2 text-sm text-slate-600">{order.description}</p>
-            {order.merchantAddress && (
-              <p className="mt-2 text-xs font-mono text-slate-400 truncate">
-                收款地址：{order.merchantAddress.slice(0, 8)}...
-                {order.merchantAddress.slice(-6)}
-              </p>
-            )}
           </div>
 
           <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setMode("direct")}
-                className={`py-2 text-sm rounded-lg font-medium transition-all ${
-                  mode === "direct"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500"
-                }`}
-              >
-                直接转账
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("contract")}
-                className={`py-2 text-sm rounded-lg font-medium transition-all ${
-                  mode === "contract"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500"
-                }`}
-              >
-                合约支付
-              </button>
+            {/* 确认摘要 */}
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-500">网络</span>
+                <span className="font-medium text-slate-800">Arc Testnet</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-500">资产</span>
+                <span className="font-medium text-slate-800">USDC</span>
+              </div>
+              <div className="flex justify-between gap-3 items-start">
+                <span className="text-slate-500 shrink-0">收款地址</span>
+                <div className="text-right min-w-0">
+                  <p className="font-mono text-xs text-slate-800 break-all">
+                    {order.merchantAddress || "—"}
+                  </p>
+                  {order.merchantAddress && (
+                    <button
+                      type="button"
+                      onClick={handleCopyAddress}
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-teal-700 hover:underline"
+                    >
+                      <Copy className="w-3 h-3" />
+                      {copied ? "已复制" : "复制地址"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-500">到账方式</span>
+                <span className="font-medium text-slate-800">
+                  直转商户钱包 · 即时
+                </span>
+              </div>
             </div>
 
-            <p className="text-xs text-slate-400 text-center">
-              {mode === "direct"
-                ? "USDC 将直接转入商户钱包地址"
-                : "通过 PaymentReceiver 合约完成支付（需订单已上链）"}
-            </p>
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="mt-1 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+              />
+              <span className="text-xs text-slate-500 leading-relaxed">
+                我已确认金额、网络与收款地址无误。资金将直接转入商户地址，平台不经手。
+              </span>
+            </label>
 
             {error && (
               <div className="flex items-start gap-2 text-sm text-red-500 bg-red-50 p-3 rounded-xl">
@@ -353,8 +338,8 @@ export default function PayPage() {
 
             <button
               onClick={handlePay}
-              disabled={paying || order.amount === "0"}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm transition-all disabled:opacity-60 shadow-sm shadow-teal-700/20"
+              disabled={paying || order.amount === "0" || !confirmed}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm transition-all disabled:opacity-50 shadow-sm shadow-teal-700/20"
             >
               {paying ? (
                 <>
@@ -364,14 +349,14 @@ export default function PayPage() {
               ) : (
                 <>
                   <Wallet className="w-4 h-4" />
-                  连接钱包并支付
+                  连接钱包并支付 {order.amount} USDC
                 </>
               )}
             </button>
 
             <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Arc Testnet · USDC</span>
+              <span>Arc Testnet · 测试网络 · 非主网资金</span>
             </div>
           </div>
         </div>
