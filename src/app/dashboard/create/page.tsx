@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Link2, Copy, Check, Loader2, AlertCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Link2,
+  Copy,
+  Check,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function CreatePaymentPage() {
@@ -40,14 +47,23 @@ export default function CreatePaymentPage() {
         throw new Error("未找到收款钱包，请重新登录");
       }
 
-      const link = `${window.location.origin}/pay/${id}`;
-      const orderData = {
+      const payload = {
         id,
         amount,
         description,
+        merchantAddress,
+      };
+
+      // 编码进 URL，方便跨设备打开
+      const encoded = btoa(
+        unescape(encodeURIComponent(JSON.stringify(payload)))
+      );
+      const link = `${window.location.origin}/pay/${id}?d=${encoded}`;
+
+      const orderData = {
+        ...payload,
         createdAt: new Date().toISOString(),
         paid: false,
-        merchantAddress,
       };
       localStorage.setItem(`arcpay_order_${id}`, JSON.stringify(orderData));
 
@@ -72,7 +88,7 @@ export default function CreatePaymentPage() {
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center">
           <button
             onClick={() => router.push("/dashboard")}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             返回后台
@@ -107,7 +123,7 @@ export default function CreatePaymentPage() {
                   placeholder="0.00"
                   required
                   disabled={loading}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 disabled:opacity-50"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all text-sm disabled:opacity-50"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400">
                   USDC
@@ -126,7 +142,7 @@ export default function CreatePaymentPage() {
                 placeholder="例如：咨询费用、设计服务..."
                 required
                 disabled={loading}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 disabled:opacity-50"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all text-sm disabled:opacity-50"
               />
             </div>
 
@@ -140,7 +156,7 @@ export default function CreatePaymentPage() {
             <button
               type="submit"
               disabled={loading || !amount || !description}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm transition-all shadow-sm shadow-teal-700/20 disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -177,14 +193,14 @@ export default function CreatePaymentPage() {
             <div className="flex gap-3">
               <button
                 onClick={handleCopy}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-sm font-medium hover:bg-slate-50"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 transition-all"
               >
                 <Copy className="w-4 h-4" />
                 {copied ? "已复制" : "复制链接"}
               </button>
               <button
                 onClick={() => router.push("/dashboard")}
-                className="flex-1 py-2.5 rounded-xl bg-teal-700 text-white text-sm font-medium hover:bg-teal-800"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm transition-all"
               >
                 返回后台
               </button>
