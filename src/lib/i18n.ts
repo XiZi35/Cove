@@ -1,0 +1,151 @@
+export type Locale = "zh" | "en";
+
+export const messages = {
+  zh: {
+    brandTag: "Built on Arc · Settled in USDC",
+    heroTitle1: "邮箱开通，链接收款",
+    heroTitle2: "USDC 即时到账",
+    heroSub:
+      "面向创业者与企业的 USDC 收款工具。无需助记词，无需懂链。创建支付链接，分享给客户，资金直达你的钱包。",
+    ctaStart: "免费体验收款",
+    ctaContract: "查看合约",
+    testnetBadge: "Arc Testnet",
+    testnetNote: "当前为 Testnet 工作原型 · 请使用测试 USDC",
+    feature1Title: "邮箱即可开通",
+    feature1Desc: "登录后自动创建 Circle 收款钱包，无需助记词与私钥管理。",
+    feature2Title: "支付链接收款",
+    feature2Desc: "设置金额与说明，一键生成链接。客户打开即可支付 USDC。",
+    feature3Title: "资金直达钱包",
+    feature3Desc: "USDC 直接转入你的地址，平台不经手。Arc 上秒级确认。",
+    stepsTitle: "四步完成一笔收款",
+    step1: "邮箱登录",
+    step2: "自动创建钱包",
+    step3: "生成支付链接",
+    step4: "接收 USDC",
+    faqTitle: "常见问题",
+    faq1q: "需要助记词吗？",
+    faq1a: "不需要。商户用邮箱登录，系统通过 Circle 自动创建收款钱包。",
+    faq2q: "客户如何付款？",
+    faq2a: "打开支付链接，连接 MetaMask（Arc Testnet），确认后直接转 USDC。",
+    faq3q: "平台会经手资金吗？",
+    faq3a: "不会。USDC 从付款人钱包直达商户地址。",
+    faq4q: "现在是主网吗？",
+    faq4a: "当前为 Arc Testnet 工作原型，仅用于演示与测试。",
+    footerNote: "ArcPay · Working prototype on Arc Testnet",
+    navLogin: "登录",
+    navApp: "进入应用",
+    loginTitle: "邮箱登录",
+    loginSub: "首次登录将自动创建 Arc 收款钱包",
+    emailLabel: "邮箱地址",
+    emailPlaceholder: "you@company.com",
+    loginBtn: "进入后台",
+    loginCreating: "正在为你创建收款钱包...",
+    loginOk: "钱包创建成功，正在跳转...",
+    loginShield: "钱包由 Circle Developer-Controlled 创建",
+    paySecure: "ArcPay 安全收款",
+    payAmount: "支付金额",
+    network: "网络",
+    asset: "资产",
+    payTo: "收款地址",
+    settle: "到账方式",
+    settleValue: "直转商户钱包 · 即时",
+    copyAddr: "复制地址",
+    copied: "已复制",
+    payConfirm:
+      "我已确认金额、网络与收款地址无误。资金将直接转入商户地址，平台不经手。",
+    payBtn: "连接钱包并支付",
+    paying: "处理中...",
+    success: "支付成功",
+    paidPrefix: "已支付",
+    viewTx: "在 ArcScan 查看",
+    copyReceipt: "复制支付凭证",
+    receiptCopied: "凭证已复制",
+    testnetFoot: "Arc Testnet · 测试网络 · 非主网资金",
+    noWallet:
+      "未检测到钱包。请安装并解锁 MetaMask，网络选择 Arc Testnet 后刷新页面。",
+  },
+  en: {
+    brandTag: "Built on Arc · Settled in USDC",
+    heroTitle1: "Email in. Link out.",
+    heroTitle2: "USDC settled instantly",
+    heroSub:
+      "USDC payment links for businesses. No seed phrases. No chain complexity. Create a link, share it, get paid to your wallet.",
+    ctaStart: "Start receiving",
+    ctaContract: "View contract",
+    testnetBadge: "Arc Testnet",
+    testnetNote: "Testnet prototype · Use test USDC only",
+    feature1Title: "Email onboarding",
+    feature1Desc:
+      "Sign in and a Circle receiving wallet is created automatically—no seed phrases.",
+    feature2Title: "Payment links",
+    feature2Desc:
+      "Set amount and memo, generate a link. Customers pay USDC in one flow.",
+    feature3Title: "Direct to wallet",
+    feature3Desc:
+      "USDC goes straight to your address. ArcPay never touches the funds.",
+    stepsTitle: "Four steps to get paid",
+    step1: "Sign in with email",
+    step2: "Wallet created",
+    step3: "Create payment link",
+    step4: "Receive USDC",
+    faqTitle: "FAQ",
+    faq1q: "Do I need a seed phrase?",
+    faq1a: "No. Merchants sign in with email; Circle creates the wallet for you.",
+    faq2q: "How do customers pay?",
+    faq2a:
+      "Open the link, connect MetaMask on Arc Testnet, confirm, and transfer USDC.",
+    faq3q: "Does ArcPay hold funds?",
+    faq3a: "No. USDC moves directly from payer to merchant address.",
+    faq4q: "Is this mainnet?",
+    faq4a: "This is an Arc Testnet prototype for demos and feedback only.",
+    footerNote: "ArcPay · Working prototype on Arc Testnet",
+    navLogin: "Log in",
+    navApp: "Open app",
+    loginTitle: "Sign in with email",
+    loginSub: "A receiving wallet is created automatically on first login",
+    emailLabel: "Email",
+    emailPlaceholder: "you@company.com",
+    loginBtn: "Continue",
+    loginCreating: "Creating your receiving wallet...",
+    loginOk: "Wallet ready. Redirecting...",
+    loginShield: "Wallet by Circle Developer-Controlled Wallets",
+    paySecure: "Secure payment via ArcPay",
+    payAmount: "Amount",
+    network: "Network",
+    asset: "Asset",
+    payTo: "Recipient",
+    settle: "Settlement",
+    settleValue: "Direct to merchant · Instant",
+    copyAddr: "Copy address",
+    copied: "Copied",
+    payConfirm:
+      "I confirm the amount, network, and recipient address. Funds go directly to the merchant wallet.",
+    payBtn: "Connect wallet & pay",
+    paying: "Processing...",
+    success: "Payment successful",
+    paidPrefix: "Paid",
+    viewTx: "View on ArcScan",
+    copyReceipt: "Copy receipt",
+    receiptCopied: "Receipt copied",
+    testnetFoot: "Arc Testnet · test network only",
+    noWallet:
+      "No wallet detected. Install and unlock MetaMask, switch to Arc Testnet, then refresh.",
+  },
+} as const;
+
+export type MessageKey = keyof typeof messages.zh;
+
+export function t(locale: Locale, key: MessageKey): string {
+  return messages[locale][key];
+}
+
+export function getStoredLocale(): Locale {
+  if (typeof window === "undefined") return "zh";
+  const saved = localStorage.getItem("arcpay_locale");
+  if (saved === "en" || saved === "zh") return saved;
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+export function setStoredLocale(locale: Locale) {
+  localStorage.setItem("arcpay_locale", locale);
+}

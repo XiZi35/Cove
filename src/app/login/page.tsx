@@ -1,13 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mail, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
+import { ArcPayLogo } from "@/components/Logo";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
+import {
+  type Locale,
+  t,
+  getStoredLocale,
+  setStoredLocale,
+} from "@/lib/i18n";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [locale, setLocale] = useState<Locale>("zh");
+
+  useEffect(() => {
+    setLocale(getStoredLocale());
+  }, []);
+
+  const switchLocale = (l: Locale) => {
+    setLocale(l);
+    setStoredLocale(l);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,10 +33,9 @@ export default function LoginPage() {
 
     setLoading(true);
     setError("");
-    setStatus("正在登录...");
+    setStatus(t(locale, "loginBtn") + "...");
 
     try {
-      // 已有钱包则直接进入
       const existing = localStorage.getItem(`arcpay_wallet_${email}`);
       if (existing) {
         localStorage.setItem("arcpay_user_email", email);
@@ -27,7 +44,7 @@ export default function LoginPage() {
         return;
       }
 
-      setStatus("正在为你创建收款钱包...");
+      setStatus(t(locale, "loginCreating"));
 
       const res = await fetch("/api/wallet", {
         method: "POST",
@@ -36,10 +53,8 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-      console.log("createWallet response:", data);
-
       if (!res.ok) {
-        throw new Error(data.error || data.message || "创建钱包失败");
+        throw new Error(data.error || data.message || "Failed");
       }
 
       const walletInfo = JSON.stringify({
@@ -53,90 +68,97 @@ export default function LoginPage() {
       localStorage.setItem("arcpay_wallet", walletInfo);
       localStorage.setItem(`arcpay_wallet_${email}`, walletInfo);
 
-      setStatus("钱包创建成功，正在跳转...");
+      setStatus(t(locale, "loginOk"));
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 600);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "登录失败");
+      setError(err.message || "Error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-teal-700 text-white text-2xl font-bold mb-4 shadow-lg shadow-teal-700/20">
-            A
-          </div>
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
-            ArcPay
-          </h1>
-          <p className="mt-2 text-slate-500 text-sm">
-            让加密支付像传统支付一样简单
-          </p>
-        </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="px-4 h-14 flex items-center justify-end max-w-md mx-auto w-full">
+        <LanguageSwitch locale={locale} onChange={switchLocale} />
+      </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
-          <div className="mb-6">
-            <h2 className="text-lg font-medium text-slate-900">邮箱登录</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              首次登录将自动创建 Arc 收款钱包
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <ArcPayLogo size={48} />
+            </div>
+            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+              ArcPay
+            </h1>
+            <p className="mt-2 text-slate-500 text-sm">
+              {t(locale, "heroTitle1")}
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                邮箱地址
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  required
-                  disabled={loading}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all text-sm disabled:opacity-50"
-                />
-              </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+            <div className="mb-6">
+              <h2 className="text-lg font-medium text-slate-900">
+                {t(locale, "loginTitle")}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {t(locale, "loginSub")}
+              </p>
             </div>
 
-            {error && (
-              <p className="text-sm text-red-500 break-all">{error}</p>
-            )}
-            {status && !error && (
-              <p className="text-sm text-teal-600">{status}</p>
-            )}
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  {t(locale, "emailLabel")}
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t(locale, "emailPlaceholder")}
+                    required
+                    disabled={loading}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all text-sm disabled:opacity-50"
+                  />
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading || !email}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-teal-700/20"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  处理中...
-                </>
-              ) : (
-                <>
-                  进入后台
-                  <ArrowRight className="w-4 h-4" />
-                </>
+              {error && (
+                <p className="text-sm text-red-500 break-all">{error}</p>
               )}
-            </button>
-          </form>
-        </div>
+              {status && !error && (
+                <p className="text-sm text-teal-600">{status}</p>
+              )}
 
-        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>钱包由 Circle Developer-Controlled 创建</span>
+              <button
+                type="submit"
+                disabled={loading || !email}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-medium text-sm transition-all disabled:opacity-50 shadow-sm shadow-teal-700/20"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t(locale, "paying")}
+                  </>
+                ) : (
+                  <>
+                    {t(locale, "loginBtn")}
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>{t(locale, "loginShield")}</span>
+          </div>
         </div>
       </div>
     </div>
