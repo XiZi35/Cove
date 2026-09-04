@@ -18,6 +18,7 @@ import {
   getStoredLocale,
   setStoredLocale,
 } from "@/lib/i18n";
+import { encodePayload } from "@/lib/payload";
 
 export default function CreatePaymentPage() {
   const router = useRouter();
@@ -74,9 +75,7 @@ export default function CreatePaymentPage() {
         merchantAddress,
       };
 
-      const encoded = btoa(
-        unescape(encodeURIComponent(JSON.stringify(payload)))
-      );
+      const encoded = encodePayload(payload);
       const link = `${window.location.origin}/pay/${id}?d=${encoded}`;
 
       const orderData = {
@@ -87,22 +86,21 @@ export default function CreatePaymentPage() {
       };
       localStorage.setItem(`arcpay_order_${id}`, JSON.stringify(orderData));
 
-      // 服务端持久化
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create",
-          id,
-          email,
-          amount,
-          description,
-          merchantAddress,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        console.warn("server save failed", data);
+      try {
+        await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create",
+            id,
+            email,
+            amount,
+            description,
+            merchantAddress,
+          }),
+        });
+      } catch (err) {
+        console.warn("server save failed", err);
       }
 
       setPaymentLink(link);
@@ -146,8 +144,8 @@ export default function CreatePaymentPage() {
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             {locale === "zh"
-              ? "客户将直接向你的钱包支付 USDC"
-              : "Customers pay USDC directly to your wallet"}
+              ? "生成链接后，客户将直接向你的钱包支付 USDC"
+              : "After you share the link, customers pay USDC straight to your wallet"}
           </p>
         </div>
 
@@ -275,6 +273,12 @@ export default function CreatePaymentPage() {
                 {paymentLink}
               </p>
             </div>
+
+            <p className="text-xs text-slate-400 text-center">
+              {locale === "zh"
+                ? "分享此链接即可收款。到账以 Arc 链上交易为准。"
+                : "Share this link to get paid. Settlement is confirmed on Arc."}
+            </p>
 
             <div className="flex gap-3">
               <button
