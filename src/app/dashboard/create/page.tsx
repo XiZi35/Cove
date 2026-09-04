@@ -51,6 +51,7 @@ export default function CreatePaymentPage() {
 
     try {
       const id = `order_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const email = localStorage.getItem("arcpay_user_email") || "";
 
       let merchantAddress = "";
       try {
@@ -80,10 +81,29 @@ export default function CreatePaymentPage() {
 
       const orderData = {
         ...payload,
+        email,
         createdAt: new Date().toISOString(),
         paid: false,
       };
       localStorage.setItem(`arcpay_order_${id}`, JSON.stringify(orderData));
+
+      // 服务端持久化
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          id,
+          email,
+          amount,
+          description,
+          merchantAddress,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.warn("server save failed", data);
+      }
 
       setPaymentLink(link);
       setCreated(true);
@@ -102,8 +122,7 @@ export default function CreatePaymentPage() {
 
   const previewAmount = amount || "0.00";
   const previewDesc =
-    description ||
-    (locale === "zh" ? "订单说明" : "Payment memo");
+    description || (locale === "zh" ? "订单说明" : "Payment memo");
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -127,8 +146,8 @@ export default function CreatePaymentPage() {
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             {locale === "zh"
-              ? "设置金额和说明，生成收款链接"
-              : "Set amount and memo, then generate a payment link"}
+              ? "客户将直接向你的钱包支付 USDC"
+              : "Customers pay USDC directly to your wallet"}
           </p>
         </div>
 
@@ -205,7 +224,6 @@ export default function CreatePaymentPage() {
               </button>
             </form>
 
-            {/* Preview */}
             <div>
               <p className="text-xs font-medium text-slate-400 mb-2 px-1">
                 {locale === "zh" ? "客户将看到" : "Customer preview"}

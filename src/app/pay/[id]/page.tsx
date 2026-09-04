@@ -61,47 +61,78 @@ export default function PayPage() {
   useEffect(() => {
     if (!orderIdParam) return;
 
-    try {
-      const sp = new URLSearchParams(window.location.search);
-      const d = sp.get("d");
-      if (d) {
-        const data = JSON.parse(decodeURIComponent(escape(atob(d))));
-        setOrder({
-          amount: String(data.amount),
-          description: data.description || "",
-          paid: false,
-          merchantAddress: data.merchantAddress,
-        });
-        return;
-      }
-    } catch (e) {
-      console.warn("parse url payload failed", e);
-    }
-
-    try {
-      const raw = localStorage.getItem(`arcpay_order_${orderIdParam}`);
-      if (raw) {
-        const data = JSON.parse(raw);
-        setOrder({
-          amount: String(data.amount),
-          description: data.description || "",
-          paid: data.paid || false,
-          merchantAddress: data.merchantAddress,
-        });
-        if (data.paid) {
-          setPaid(true);
-          if (data.txHash) setTxHash(data.txHash);
+    const load = async () => {
+      // 1. URL payload
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const d = sp.get("d");
+        if (d) {
+          const data = JSON.parse(decodeURIComponent(escape(atob(d))));
+          setOrder({
+            amount: String(data.amount),
+            description: data.description || "",
+            paid: false,
+            merchantAddress: data.merchantAddress,
+          });
+          return;
         }
-        return;
+      } catch (e) {
+        console.warn("parse url payload failed", e);
       }
-    } catch {}
 
-    setError(
-      locale === "zh"
-        ? "订单不存在或链接无效，请让商户重新生成支付链接"
-        : "Invalid or missing order. Ask the merchant for a new link."
-    );
-    setOrder({ amount: "0", description: "—", paid: false });
+      // 2. localStorage
+      try {
+        const raw = localStorage.getItem(`arcpay_order_${orderIdParam}`);
+        if (raw) {
+          const data = JSON.parse(raw);
+          setOrder({
+            amount: String(data.amount),
+            description: data.description || "",
+            paid: data.paid || false,
+            merchantAddress: data.merchantAddress,
+          });
+          if (data.paid) {
+            setPaid(true);
+            if (data.txHash) setTxHash(data.txHash);
+          }
+          return;
+        }
+      } catch {}
+
+      // 3. server
+      try {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "get", id: orderIdParam }),
+        });
+        if (res.ok) {
+          const { order: data } = await res.json();
+          if (data) {
+            setOrder({
+              amount: String(data.amount),
+              description: data.description || "",
+              paid: data.paid || false,
+              merchantAddress: data.merchantAddress,
+            });
+            if (data.paid) {
+              setPaid(true);
+              if (data.txHash) setTxHash(data.txHash);
+            }
+            return;
+          }
+        }
+      } catch {}
+
+      setError(
+        locale === "zh"
+          ? "订单不存在或链接无效，请让商户重新生成支付链接"
+          : "Invalid or missing order. Ask the merchant for a new link."
+      );
+      setOrder({ amount: "0", description: "—", paid: false });
+    };
+
+    load();
   }, [orderIdParam, locale]);
 
   const switchLocale = (l: Locale) => {
@@ -230,6 +261,18 @@ export default function PayPage() {
             JSON.stringify(data)
           );
         }
+      } catch {}
+
+      try {
+        await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "markPaid",
+            id: orderIdParam,
+            txHash: hash,
+          }),
+        });
       } catch {}
 
       setPaid(true);

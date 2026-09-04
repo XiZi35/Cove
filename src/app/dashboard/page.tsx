@@ -95,32 +95,52 @@ export default function DashboardPage() {
       }
     } catch {}
 
-    const allOrders: Order[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("arcpay_order_")) {
-        try {
-          const data = JSON.parse(localStorage.getItem(key) || "{}");
-          if (data.id) {
-            allOrders.push({
-              id: data.id,
-              amount: data.amount,
-              description: data.description,
-              createdAt: data.createdAt,
-              paid: data.paid || false,
-              txHash: data.txHash,
-              merchantAddress: data.merchantAddress,
-            });
+    const loadOrders = async () => {
+      try {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "list", email: savedEmail }),
+        });
+        if (res.ok) {
+          const { orders: serverOrders } = await res.json();
+          if (serverOrders?.length) {
+            setOrders(serverOrders);
+            setLoading(false);
+            return;
           }
-        } catch {}
+        }
+      } catch {}
+
+      const allOrders: Order[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("arcpay_order_")) {
+          try {
+            const data = JSON.parse(localStorage.getItem(key) || "{}");
+            if (data.id) {
+              allOrders.push({
+                id: data.id,
+                amount: data.amount,
+                description: data.description,
+                createdAt: data.createdAt,
+                paid: data.paid || false,
+                txHash: data.txHash,
+                merchantAddress: data.merchantAddress,
+              });
+            }
+          } catch {}
+        }
       }
-    }
-    allOrders.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    setOrders(allOrders);
-    setLoading(false);
+      allOrders.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setOrders(allOrders);
+      setLoading(false);
+    };
+
+    loadOrders();
   }, []);
 
   const switchLocale = (l: Locale) => {
@@ -319,15 +339,22 @@ export default function DashboardPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-medium text-slate-900">
-              {t(locale, "ordersTitle")}
-            </h2>
-            <span className="text-xs text-slate-400">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <h2 className="font-medium text-slate-900">
+                {t(locale, "ordersTitle")}
+              </h2>
+              <span className="text-xs text-slate-400">
+                {locale === "zh"
+                  ? `${t(locale, "ordersTotal")} ${orders.length} ${t(locale, "ordersUnit")}`
+                  : `${orders.length} ${t(locale, "ordersUnit")}`}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
               {locale === "zh"
-                ? `${t(locale, "ordersTotal")} ${orders.length} ${t(locale, "ordersUnit")}`
-                : `${orders.length} ${t(locale, "ordersUnit")}`}
-            </span>
+                ? "状态以 Arc 链上到账为准；列表便于管理，换设备仍可从服务端同步。"
+                : "On-chain settlement is the source of truth. Orders sync from the server across devices."}
+            </p>
           </div>
 
           {loading ? (
