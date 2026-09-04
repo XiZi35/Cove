@@ -296,7 +296,7 @@ export default function PayPage() {
 
   if (paid) {
     const receiptText = [
-      "ArcPay Receipt / 支付凭证",
+      "Cove Receipt / 支付凭证",
       `${locale === "zh" ? "金额" : "Amount"}: ${order.amount} USDC`,
       `${locale === "zh" ? "说明" : "Memo"}: ${order.description}`,
       `${locale === "zh" ? "收款地址" : "To"}: ${order.merchantAddress || ""}`,

@@ -15,33 +15,28 @@ export function ArcPayLogo({
         viewBox="0 0 32 32"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        aria-label="ArcPay"
+        aria-label="Cove"
       >
         <rect width="32" height="32" rx="9" fill="#0f766e" />
+        {/* soft cove / harbor arc */}
         <path
-          d="M9.5 22.5L16 8.5L22.5 22.5"
-          stroke="white"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M12.2 17.2H19.8"
+          d="M8 14C8 14 11 22 16 22C21 22 24 14 24 14"
           stroke="white"
           strokeWidth="2.2"
           strokeLinecap="round"
         />
         <path
-          d="M8 24.5C10.5 26 13.2 26.8 16 26.8C18.8 26.8 21.5 26 24 24.5"
+          d="M11 12.5C12.5 11 14.2 10.2 16 10.2C17.8 10.2 19.5 11 21 12.5"
           stroke="white"
-          strokeOpacity="0.35"
+          strokeOpacity="0.45"
           strokeWidth="1.6"
           strokeLinecap="round"
         />
+        <circle cx="16" cy="16.5" r="1.6" fill="white" />
       </svg>
       {withWordmark && (
         <span className="text-[15px] font-semibold tracking-tight text-slate-900">
-          ArcPay
+          Cove
         </span>
       )}
     </div>

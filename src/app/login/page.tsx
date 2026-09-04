@@ -92,7 +92,7 @@ export default function LoginPage() {
               <ArcPayLogo size={48} />
             </div>
             <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
-              ArcPay
+              Cove
             </h1>
             <p className="mt-2 text-slate-500 text-sm">
               {t(locale, "heroTitle1")}
